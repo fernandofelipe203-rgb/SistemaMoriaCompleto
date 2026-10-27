@@ -26,6 +26,12 @@ public class Produto {
     @Enumerated(EnumType.STRING)
     private CategoriaProduto categoria;
     private String descricao;
+    private String codigo;
+
+    private String unidade;
+
+    @PositiveOrZero(message = "O estoque mínimo não pode ser negativo")
+    private Integer estoqueMinimo = 0;
 
     @NotNull(message = "A quantidade em estoque é obrigatória")
     @PositiveOrZero(message = "A quantidade em estoque não pode ser negativa")
@@ -76,5 +82,29 @@ public class Produto {
 
     public void setCategoria(CategoriaProduto categoria) {
         this.categoria = categoria;
+    }
+
+    public String getCodigo() {
+        return codigo;
+    }
+
+    public void setCodigo(String codigo) {
+        this.codigo = codigo;
+    }
+
+    public String getUnidade() {
+        return unidade;
+    }
+
+    public void setUnidade(String unidade) {
+        this.unidade = unidade;
+    }
+
+    public @PositiveOrZero(message = "O estoque mínimo não pode ser negativo") Integer getEstoqueMinimo() {
+        return estoqueMinimo;
+    }
+
+    public void setEstoqueMinimo(@PositiveOrZero(message = "O estoque mínimo não pode ser negativo") Integer estoqueMinimo) {
+        this.estoqueMinimo = estoqueMinimo;
     }
 }

@@ -1,8 +1,10 @@
 package com.lojas.moria.service;
 
+import com.lojas.moria.execption.ProdutoComMovimentacoesException;
 import com.lojas.moria.execption.ProdutoNaoEncontradoException;
 import com.lojas.moria.model.CategoriaProduto;
 import com.lojas.moria.model.Produto;
+import com.lojas.moria.repository.ItemMovimentacaoEstoqueRepository;
 import com.lojas.moria.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,8 @@ repository. e o repository*/
 public class ProdutoService {
     @Autowired
     private ProdutoRepository produtoRepository;
+    @Autowired
+    private ItemMovimentacaoEstoqueRepository itemMovimentacaoEstoqueRepository;
 
 
     public List<Produto> listarProdutos(){
@@ -32,25 +36,46 @@ public class ProdutoService {
     public Produto cadastrarProduto(Produto produto){
         return produtoRepository.save(produto);
     }
-        public  Produto atulizarProduto(Long id, Produto produto){
-         Produto produtoExistente = produtoRepository.findById(id).orElseThrow(() -> new ProdutoNaoEncontradoException("Produto nao encontrado com o ID: " + id));
+    public Produto atualizarProduto(Long id, Produto produto) {
 
-         produtoExistente.setNome(produto.getNome());
-         produtoExistente.setPreco(produto.getPreco());
-         produtoExistente.setDescricao(produto.getDescricao());
-         produtoExistente.setQuantidadeEmEstoque(produto.getQuantidadeEmEstoque());
-         produtoExistente.setCategoria(produto.getCategoria());
+        Produto produtoExistente = produtoRepository.findById(id)
+                .orElseThrow(() -> new ProdutoNaoEncontradoException(
+                        "Produto não encontrado com o ID: " + id
+                ));
 
-            return  produtoRepository.save(produtoExistente);
+        produtoExistente.setNome(produto.getNome());
+        produtoExistente.setPreco(produto.getPreco());
+        produtoExistente.setDescricao(produto.getDescricao());
+        produtoExistente.setCategoria(produto.getCategoria());
+        produtoExistente.setCodigo(produto.getCodigo());
+        produtoExistente.setEstoqueMinimo(produto.getEstoqueMinimo());
+        produtoExistente.setUnidade(produto.getUnidade());
+
+        // Preservamos a quantidade atual do estoque.
+        // O estoque será alterado somente pelas movimentações.
+
+        return produtoRepository.save(produtoExistente);
+    }
+
+
+    public void excluirProduto(Long id) {
+        Produto produto = produtoRepository.findById(id)
+                .orElseThrow(() -> new ProdutoNaoEncontradoException(
+                        "Produto não encontrado com o ID: " + id
+                ));
+
+        boolean possuiMovimentacoes =
+                itemMovimentacaoEstoqueRepository.existsByProduto_Id(id);
+
+        if (possuiMovimentacoes) {
+            throw new ProdutoComMovimentacoesException(
+                    "Não é possível excluir este produto porque ele possui movimentações de estoque registradas."
+            );
         }
 
-   public void  excluirProduto(Long id){
-         produtoRepository.findById(id)
-                 .orElseThrow(()-> new ProdutoNaoEncontradoException("Produto nao encontrado com o ID: " +id));
+        produtoRepository.delete(produto);
+    }
 
-         produtoRepository.deleteById(id);
-
-   }
     public List<Produto> buscarPorCategoria(CategoriaProduto categoria) {
         return produtoRepository.findByCategoria(categoria);
     }

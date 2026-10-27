@@ -1,5 +1,7 @@
 package com.lojas.moria.controller;
 
+import com.lojas.moria.dto.ProdutoEstoqueResponse;
+import com.lojas.moria.dto.ProdutoVendaResponse;
 import com.lojas.moria.model.CategoriaProduto;
 import com.lojas.moria.model.Produto;
 import com.lojas.moria.service.ProdutoService;
@@ -19,9 +21,35 @@ public class ProdutoController {
 
     //Buscando produtos
     @GetMapping
-    public List<Produto> listar() {
-        return produtoService.listarProdutos();
+    public List<ProdutoVendaResponse> listar() {
+        return produtoService.listarProdutos()
+                .stream()
+                .map(this::converterParaVendaResponse)
+                .toList();
     }
+
+    @GetMapping("/estoque")
+    public List<ProdutoEstoqueResponse> listarParaEstoque() {
+        return produtoService.listarProdutos()
+                .stream()
+                .map(produto -> {
+                    ProdutoEstoqueResponse response = new ProdutoEstoqueResponse();
+
+                    response.setId(produto.getId());
+                    response.setCodigo(produto.getCodigo());
+                    response.setNome(produto.getNome());
+                    response.setPreco(produto.getPreco());
+                    response.setQuantidadeEmEstoque(
+                            produto.getQuantidadeEmEstoque()
+                    );
+                    response.setEstoqueMinimo(produto.getEstoqueMinimo());
+                    response.setUnidade(produto.getUnidade());
+
+                    return response;
+                })
+                .toList();
+    }
+
 
     //Buscar produto por ID
     @GetMapping("/{id}")
@@ -34,15 +62,18 @@ public class ProdutoController {
         return produtoService.buscarPorNome(nome);
     }
 
-    //Criando produtos
     @PostMapping
     public Produto cadastrar(@Valid @RequestBody Produto produto) {
-        return produtoService.cadastrarProduto(produto);
+        System.out.println("Nome: " + produto.getNome());
+        System.out.println("Categoria: " + produto.getCategoria());
+        System.out.println("Preço: " + produto.getPreco());
+        System.out.println("Quantidade: " + produto.getQuantidadeEmEstoque());
 
+        return produtoService.cadastrarProduto(produto);
     }
     @PutMapping("/{id}")
     public Produto atulizar(@PathVariable Long id, @RequestBody Produto produto){
-        return produtoService.atulizarProduto(id,produto);
+        return produtoService.atualizarProduto(id,produto);
     }
 
     @DeleteMapping("/{id}")
@@ -54,6 +85,17 @@ public class ProdutoController {
     public List<Produto> buscarPorCategoria(
             @PathVariable CategoriaProduto categoria) {
         return produtoService.buscarPorCategoria(categoria);
+    }
+    private ProdutoVendaResponse converterParaVendaResponse(Produto produto) {
+        ProdutoVendaResponse response = new ProdutoVendaResponse();
+
+        response.setId(produto.getId());
+        response.setCodigo(produto.getCodigo());
+        response.setNome(produto.getNome());
+        response.setPreco(produto.getPreco());
+        response.setEstoque(produto.getQuantidadeEmEstoque());
+
+        return response;
     }
 }
 

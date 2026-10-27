@@ -42,6 +42,7 @@ public class MovimentacaoEstoqueService {
                         new ProdutoNaoEncontradoException("Produto não encontrado"));
     }
 
+
     @Transactional
     public void registrarMovimentacao(MovimentacaoEstoque movimentacao) {
 
@@ -55,16 +56,25 @@ public class MovimentacaoEstoqueService {
             throw new IllegalArgumentException(
                     "Tipo de movimentação não suportado");
         }
+
         if (movimentacao.getItens() == null
                 || movimentacao.getItens().isEmpty()) {
             throw new IllegalArgumentException(
                     "A movimentação deve possuir pelo menos um produto");
         }
+
+        // Primeiro, validamos todos os itens sem alterar o estoque.
+        java.util.Map<Long, Integer> quantidadesPorProduto =
+                new java.util.HashMap<>();
+
+        java.util.Map<Long, Produto> produtos =
+                new java.util.HashMap<>();
+
         for (ItemMovimentacaoEstoque item : movimentacao.getItens()) {
 
             if (item.getQuantidade() == null || item.getQuantidade() <= 0) {
                 throw new IllegalArgumentException(
-                        "A quantidade do item deve ser maior que zero");
+                        "A quantidade deve ser maior que zero");
             }
 
             if (item.getProduto() == null
@@ -72,46 +82,78 @@ public class MovimentacaoEstoqueService {
                 throw new IllegalArgumentException(
                         "O produto do item é obrigatório");
             }
-            Produto produto = buscarProduto(item.getProduto().getId());
+
+            Long produtoId = item.getProduto().getId();
+
+            Produto produto = produtos.get(produtoId);
+
+            if (produto == null) {
+                produto = buscarProduto(produtoId);
+                produtos.put(produtoId, produto);
+            }
+
+            if (produto.getQuantidadeEmEstoque() == null
+                    || produto.getQuantidadeEmEstoque() < 0) {
+                throw new IllegalStateException(
+                        "O estoque atual do produto é inválido: "
+                                + produto.getNome());
+            }
 
             item.setProduto(produto);
-            Integer estoqueAtual = produto.getQuantidadeEmEstoque();
 
-            if (estoqueAtual == null || estoqueAtual < 0) {
-                throw new IllegalStateException(
-                        "O estoque atual do produto é inválido");
+            int quantidadeAcumulada = quantidadesPorProduto.getOrDefault(
+                    produtoId, 0);
+
+            if (item.getQuantidade() > Integer.MAX_VALUE - quantidadeAcumulada) {
+                throw new IllegalArgumentException(
+                        "A quantidade total ultrapassa o limite permitido");
             }
 
-            if (movimentacao.getTipo() == TipoMovimentacao.ENTRADA) {
+            quantidadesPorProduto.put(
+                    produtoId, quantidadeAcumulada + item.getQuantidade());
+        }
 
+        // Depois, validamos o total de cada produto.
+        for (java.util.Map.Entry<Long, Integer> entrada
+                : quantidadesPorProduto.entrySet()) {
 
-                Integer quantidadeEntrada = item.getQuantidade();
-                if (quantidadeEntrada > Integer.MAX_VALUE - estoqueAtual) {
-                    throw new IllegalArgumentException(
-                            "A quantidade ultrapassa o limite permitido para o estoque");
-                }
+            Produto produto = produtos.get(entrada.getKey());
+            int quantidadeTotal = entrada.getValue();
+            int estoqueAtual = produto.getQuantidadeEmEstoque();
 
-                produto.setQuantidadeEmEstoque(estoqueAtual + quantidadeEntrada);
+            if (movimentacao.getTipo() == TipoMovimentacao.SAIDA
+                    && quantidadeTotal > estoqueAtual) {
+                throw new EstoqueInsuficienteException(
+                        "Estoque insuficiente para o produto: "
+                                + produto.getNome());
+            }
 
-
-            } else if (movimentacao.getTipo() == TipoMovimentacao.SAIDA) {
-
-
-                Integer quantidadeSaida = item.getQuantidade();
-
-                if (quantidadeSaida > estoqueAtual) {
-                    throw new EstoqueInsuficienteException(
-                            "Estoque insuficiente para o produto: " + produto.getNome()
-                    );
-                }
-
-                produto.setQuantidadeEmEstoque(estoqueAtual - quantidadeSaida);
-
-
+            if (movimentacao.getTipo() == TipoMovimentacao.ENTRADA
+                    && quantidadeTotal > Integer.MAX_VALUE - estoqueAtual) {
+                throw new IllegalArgumentException(
+                        "A entrada ultrapassa o limite permitido para o produto: "
+                                + produto.getNome());
             }
         }
+
+        // Só alteramos o estoque depois de todas as validações passarem.
+        for (java.util.Map.Entry<Long, Integer> entrada
+                : quantidadesPorProduto.entrySet()) {
+
+            Produto produto = produtos.get(entrada.getKey());
+            int quantidadeTotal = entrada.getValue();
+            int estoqueAtual = produto.getQuantidadeEmEstoque();
+
+            if (movimentacao.getTipo() == TipoMovimentacao.ENTRADA) {
+                produto.setQuantidadeEmEstoque(estoqueAtual + quantidadeTotal);
+            } else {
+                produto.setQuantidadeEmEstoque(estoqueAtual - quantidadeTotal);
+            }
+        }
+
         movimentacaoEstoqueRepository.save(movimentacao);
     }
+
 
 
 

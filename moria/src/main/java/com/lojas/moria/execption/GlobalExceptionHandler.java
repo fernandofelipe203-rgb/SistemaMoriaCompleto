@@ -173,5 +173,13 @@ public class GlobalExceptionHandler  {
 
         return ResponseEntity.badRequest().body(resposta);
     }
+    @ExceptionHandler(ProdutoComMovimentacoesException.class)
+    public ResponseEntity<String> tratarProdutoComMovimentacoes(
+            ProdutoComMovimentacoesException excecao) {
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(excecao.getMessage());
+    }
 
 }
